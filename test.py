@@ -116,4 +116,3 @@ finally:
     if hasattr(sio, 'connected') and sio.connected:
         sio.disconnect()
 
-        
