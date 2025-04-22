@@ -1,0 +1,119 @@
+import socketio
+import json
+import time
+
+# สร้าง Socket.IO client ด้วย logger เพื่อดูข้อความทั้งหมด
+sio = socketio.Client(logger=True)
+
+# กำหนดตัวจัดการเหตุการณ์
+@sio.event
+def connect():
+    print(f'เชื่อมต่อสำเร็จ, socket ID: {sio.sid}')
+    
+    # ส่งข้อมูลการเข้าร่วมห้อง
+    user_id = "678f61a36c184a338cf7ce50"
+    data = json.dumps({"userId": user_id})
+    
+    # ส่งเหตุการณ์ join:all:rooms
+    sio.emit('join:all:rooms', data)
+    print(f'ส่งคำขอเข้าร่วมห้องแล้ว: {data}')
+
+@sio.event
+def disconnect():
+    print("ตัดการเชื่อมต่อจากเซิร์ฟเวอร์")
+
+@sio.event
+def connect_error(data):
+    print(f"การเชื่อมต่อผิดพลาด: {data}")
+
+# จับเหตุการณ์พื้นฐาน
+@sio.on('ping')
+def on_ping(data):
+    print(f'ได้รับ ping: {data}')
+
+@sio.on('pong')
+def on_pong(data):
+    print(f'ได้รับ pong: {data}')
+
+# จับเหตุการณ์เฉพาะของแอพ
+@sio.on('keepAlive')
+def on_keep_alive(data):
+    print(f'ได้รับ keepAlive: {data}')
+
+@sio.on('rooms:joined')
+def on_rooms_joined(data):
+    print(f'ได้รับข้อมูล rooms:joined: {data}')
+
+@sio.on('rooms:joined:678f61a36c184a338cf7ce50')
+def on_rooms_joined_user(data):
+    print(f'ได้รับข้อมูล rooms:joined:678f61a36c184a338cf7ce50: {data}')
+
+@sio.on('messages:update:7e453113-536a-4691-97ed-9e3930c14654')
+def on_messages_update(data):
+    try:
+        # ดึงข้อมูลข้อความจาก data
+        messages_list = data.get('data', [])
+        
+        for session in messages_list:
+            messages = session.get('messages', [])
+            
+            for message in messages:
+                display_name = message.get('displayName', '')
+                content = message.get('content', '')
+                
+                # แสดงเฉพาะ displayName และ content
+                print(f'ชื่อผู้ส่ง: {display_name}, ข้อความ: {content}')
+                
+    except Exception as e:
+        print(f"เกิดข้อผิดพลาดในการประมวลผลข้อความ: {e}")
+
+# เชื่อมต่อกับเซิร์ฟเวอร์
+try:
+    # ตั้งค่า token
+    token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3NVVUlEIjoiY2ZkNDU4OGYtOThlNC00MTNiLWIzMmQtZTNkMjM5ZGU5ZTQyIiwiZGV2aWNlSUQiOiI4MDg3ZDI1MTgxMTkwYmJmIiwiZXhwIjoxNzc2ODY1MTkyLCJ1c2VySUQiOiI2NzhmNjFhMzZjMTg0YTMzOGNmN2NlNTAifQ.DfnbLiSYl910UNw0qwkCb0IMGbQ8HcZliKaSYy0ek_E'
+    server_url = "https://sit.apigoochat.net"
+    
+    # ตั้งค่า headers
+    headers = {
+        'Authorization': f'Bearer {token}'
+    }
+    
+    print(f"กำลังเชื่อมต่อกับ {server_url}...")
+    
+    # เชื่อมต่อกับเซิร์ฟเวอร์
+    sio.connect(
+        server_url,
+        socketio_path='socket/socket.io',
+        transports=['websocket'],
+        headers=headers
+    )
+    
+    # ส่ง heartbeat เป็นระยะเพื่อรักษาการเชื่อมต่อ
+    counter = 0
+    print("รอรับข้อมูลจากเซิร์ฟเวอร์... (กด Ctrl+C เพื่อหยุด)")
+    while True:
+        time.sleep(10)  # รอ 10 วินาที
+        counter += 1
+        if sio.connected:
+            # ส่ง heartbeat ทุก 30 วินาที
+            if counter % 3 == 0:
+                try:
+                    sio.emit('heartbeat', json.dumps({"timestamp": time.time()}))
+                    print(f"ส่ง heartbeat ครั้งที่ {counter//3}")
+                except Exception as emit_error:
+                    print(f"ไม่สามารถส่ง heartbeat: {emit_error}")
+        
+except KeyboardInterrupt:
+    print("\nผู้ใช้ยกเลิกการทำงาน")
+    
+except Exception as e:
+    print(f"เกิดข้อผิดพลาด: {e}")
+    import traceback
+    traceback.print_exc()
+    
+finally:
+    # ตัดการเชื่อมต่อเมื่อเสร็จสิ้น
+    if hasattr(sio, 'connected') and sio.connected:
+        sio.disconnect()
+
+
