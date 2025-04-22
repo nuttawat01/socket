@@ -115,3 +115,5 @@ finally:
     # ตัดการเชื่อมต่อเมื่อเสร็จสิ้น
     if hasattr(sio, 'connected') and sio.connected:
         sio.disconnect()
+
+        
